@@ -1,0 +1,14 @@
+temp_com/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.cache/
+data/*.csv
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.idea/
+.vscode/

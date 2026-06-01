@@ -5,6 +5,8 @@ __pycache__/
 .pytest_cache/
 .cache/
 data/*.csv
+data/*.csv:Zone.Identifier
+*.Zone.Identifier
 venv/
 .venv/
 *.egg-info/

@@ -179,20 +179,22 @@ System dzieli się na trzy warstwy potoku, odpowiadające naturalnemu podziałow
 **Wykorzystane mechanizmy:** `reduce` / `fold`, funkcje wyższego rzędu, leniwa ewaluacja.
 
 **Wejście:** strumień przefiltrowanych rekordów.
-**Wyjście:** raport tekstowy / dane do wizualizacji (opcjonalnie wykresy z `matplotlib`).
+**Wyjście:** sformatowane raporty tekstowe wypisywane na konsolę (struktury słownikowe gotowe do dalszej wizualizacji).
 
 ---
 
-## 6. Planowane analizy i raporty
+## 6. Analizy i raporty
 
-System będzie generował następujące analizy:
+System generuje następujące analizy (zaimplementowane):
 
-- **Klasyfikacja medalowa krajów** — ranking krajów według liczby zdobytych medali (z rozróżnieniem na złoto/srebro/brąz), z możliwością filtrowania po zakresie lat, sezonie i dyscyplinie.
-- **Statystyki demograficzne zawodników** — średni wiek, wzrost i waga zawodników w wybranych dyscyplinach, z analizą ewolucji w czasie.
-- **Najbardziej utytułowani zawodnicy** — ranking zawodników według liczby zdobytych medali; analiza długości karier olimpijskich.
-- **Trendy historyczne** — zmiana liczby uczestniczących krajów, dyscyplin i zawodników w czasie; udział kobiet w igrzyskach w kolejnych dekadach.
-- **Analiza dominacji w dyscyplinach** — które kraje dominowały w jakich dyscyplinach i jak to się zmieniało historycznie.
-- **Statystyki organizacyjne** — najbardziej i najmniej "produktywne" edycje igrzysk pod względem liczby konkurencji i zawodników.
+- **Klasyfikacja medalowa krajów** — ranking krajów według liczby zdobytych medali.
+- **Rozkład medali według płci** — zestawienie medali zdobytych przez kobiety i mężczyzn.
+- **Statystyki wiekowe** — średnia, mediana oraz wartości skrajne wieku medalistów (liczone bez pętli imperatywnych).
+- **Dorobek medalowy Polski** — medale reprezentacji Polski według lat oraz według dyscyplin.
+- **Udział kobiet w kolejnych dekadach** — procentowy udział kobiet wśród uczestników w podziale na dekady.
+- **Dominacja w dyscyplinach** — kraj z największą liczbą medali w każdej dyscyplinie.
+
+Kierunki dalszego rozwoju (planowane, jeszcze niezaimplementowane): ranking najbardziej utytułowanych zawodników i długość karier olimpijskich, trendy liczby uczestniczących krajów i zawodników w czasie oraz statystyki organizacyjne poszczególnych edycji igrzysk.
 
 ---
 
@@ -225,12 +227,12 @@ olympic-functional-analyzer/
 │   │   └── pipelines.py        # gotowe kompozycje
 │   └── aggregate/              # Warstwa III
 │       ├── __init__.py
-│       ├── reducers.py         # operacje reduce/fold
-│       ├── statistics.py       # statystyki
+│       ├── reducers.py         # operacje reduce/fold + statystyki
 │       └── report.py           # generowanie raportów
 └── tests/
     ├── __init__.py
     ├── conftest.py             # współdzielone fixture'y pytest
+    ├── test_result.py
     ├── test_parsing.py
     ├── test_transform.py
     └── test_aggregate.py
@@ -250,13 +252,13 @@ olympic-functional-analyzer/
 ### 8.1. Wymagania
 
 - Python 3.10 lub nowszy
-- Zależności zdefiniowane w `pyproject.toml` (m.in. `matplotlib` opcjonalnie do wykresów, `pytest` do testów)
+- Brak zależności runtime — projekt korzysta wyłącznie z biblioteki standardowej. Do testów używany jest `pytest` (zależność deweloperska zdefiniowana w `pyproject.toml`).
 
 ### 8.2. Instalacja
 
 ```bash
 git clone git@github.com:szyjac7457/Projekt-Paradygmaty-Programowania.git
-cd olympic-functional-analyzer
+cd Projekt-Paradygmaty-Programowania
 python -m venv venv
 source venv/bin/activate          # Linux / macOS
 venv\Scripts\activate             # Windows
@@ -273,10 +275,11 @@ Plik `athlete_events.csv` należy umieścić w katalogu `data/`. Plik nie jest w
 ### 8.4. Uruchomienie
 
 ```bash
-python -m src --report medal-ranking --country POL --season Summer
-python -m src --report top-athletes --limit 20
-python -m src --report demographic-trends --discipline Athletics
+python -m src                            # użyje domyślnej ścieżki data/athlete_events.csv
+python -m src data/athlete_events.csv    # albo wskaż plik jawnie
 ```
+
+Program wczytuje plik, czyści dane i wypisuje na konsolę komplet raportów: klasyfikację medalową krajów, rozkład medali wg płci, statystyki wiekowe, dorobek Polski (wg dyscyplin i lat), udział kobiet w dekadach oraz dominację krajów w dyscyplinach.
 
 ### 8.5. Testy
 
@@ -289,19 +292,16 @@ pytest tests/
 ## 9. Przykład użycia (programistycznie)
 
 ```python
-from src.parsing.reader import read_csv_lazy
-from src.parsing.parser import parse_athlete
+from src.parsing.reader import parse_csv
+from src.core.result import filter_ok
 from src.transform.filters import by_country, by_season, has_medal
 from src.aggregate.reducers import count_medals_by_country
 from src.core.functional import pipe
-from src.core.result import Result
 
 # Budujemy potok jako kompozycję czystych funkcji
 analyze_polish_summer_medals = pipe(
-    read_csv_lazy,                          # leniwe czytanie
-    lambda rows: map(parse_athlete, rows),  # parsowanie → Result[Athlete]
-    lambda rs: filter(Result.is_ok, rs),    # odrzuć błędne
-    lambda rs: map(Result.unwrap, rs),      # wydobądź wartości
+    parse_csv,                                  # leniwe czytanie + parsowanie → Result[Athlete]
+    filter_ok,                                  # odrzuć błędne rekordy i wydobądź wartości
     lambda rs: filter(by_country('POL'), rs),
     lambda rs: filter(by_season('Summer'), rs),
     lambda rs: filter(has_medal, rs),
